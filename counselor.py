@@ -10,7 +10,56 @@ openai_api_key = st.secrets["openai"]["api_key"]
 assistant_id = st.secrets["openai"]["assistant_id"]
 client = OpenAI(api_key=openai_api_key)
 
-# ... [Keep all the helper functions as they were] ...
+# Helper functions
+def save_chat_history(user_id, history):
+    os.makedirs('chat_histories', exist_ok=True)
+    with open(f'chat_histories/{user_id}.json', 'w') as f:
+        json.dump(history, f)
+
+def load_chat_history(user_id):
+    try:
+        with open(f'chat_histories/{user_id}.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return [{"role": "assistant", "content": "어떤 질문이든 해주세요, 예를들어 학업, 진로, 대인관계, 가족, 연애 등에 대한 고민을 말씀해주세요^^"}]
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def save_user_credentials(username, password):
+    hashed_password = hash_password(password)
+    os.makedirs('user_credentials', exist_ok=True)
+    with open('user_credentials/users.json', 'a+') as f:
+        f.seek(0)
+        try:
+            users = json.load(f)
+        except json.JSONDecodeError:
+            users = {}
+        users[username] = hashed_password
+        f.seek(0)
+        f.truncate()
+        json.dump(users, f)
+
+def verify_user(username, password):
+    try:
+        with open('user_credentials/users.json', 'r') as f:
+            users = json.load(f)
+            return username in users and users[username] == hash_password(password)
+    except FileNotFoundError:
+        return False
+
+def erase_chat_history(user_id):
+    st.session_state.messages = [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊"}]
+    save_chat_history(user_id, st.session_state.messages)
+    st.session_state.thread_id = None
+
+def save_chat_as_txt(user_id, messages):
+    os.makedirs('saved_chats', exist_ok=True)
+    filename = f'saved_chats/{user_id}_{time.strftime("%Y%m%d_%H%M%S")}.txt'
+    with open(filename, 'w', encoding='utf-8') as f:
+        for msg in messages:
+            f.write(f"{msg['role'].capitalize()}: {msg['content']}\n\n")
+    return filename
 
 def show_login():
     st.sidebar.header("로그인")
