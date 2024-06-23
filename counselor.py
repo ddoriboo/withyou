@@ -21,7 +21,7 @@ def load_chat_history(user_id):
         with open(f'chat_histories/{user_id}.json', 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        return [{"role": "assistant", "content": "어떤 질문이든 해주세요, 예를들어 학업, 진로, 대인관계, 가족, 연애 등에 대한 고민을 말씀해주세요^^"}]
+        return [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊"}]
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
