@@ -21,7 +21,7 @@ def load_chat_history(user_id):
         with open(f'chat_histories/{user_id}.json', 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        return [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊"}]
+        return [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊 대화가 끝난 후에는 > 버튼을 눌러 대화를 저장해주세요"}]
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -49,7 +49,7 @@ def verify_user(username, password):
         return False
 
 def erase_chat_history(user_id):
-    st.session_state.messages = [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊"}]
+    st.session_state.messages = [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊 대화가 끝난 후에는 > 버튼을 눌러 대화를 저장해주세요"}]
     save_chat_history(user_id, st.session_state.messages)
     st.session_state.thread_id = None
 
@@ -100,7 +100,8 @@ def save_chat_as_txt(user_id, messages):
 
 def main():
     st.title("💬 캠퍼스 상담사 위드유")
-    st.caption("🚀 대학생의 자기효능감을 진단하고 개선하는 최고의 어드바이저입니다.")
+    st.caption("🚀 대학생의 자기효능감을 진단하고 개선하는 최고의 어드바이저입니다.
+좌측 상단에 > 를 눌러 회원가입 및 로그인을 해주세요")
 
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
