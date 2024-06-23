@@ -4,29 +4,11 @@ from openai import OpenAI
 import os
 import json
 import hashlib
-from datetime import datetime
 
 # Set up OpenAI client
 openai_api_key = st.secrets["openai"]["api_key"]
 assistant_id = st.secrets["openai"]["assistant_id"]
 client = OpenAI(api_key=openai_api_key)
-
-# Check if Google Sheets credentials are available
-use_google_sheets = False
-try:
-    import gspread
-    from oauth2client.service_account import ServiceAccountCredentials
-    
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
-    gc = gspread.authorize(creds)
-    
-    # Open the Google Sheet
-    sheet_url = "https://docs.google.com/spreadsheets/d/1G2hSp9NScSyQvVHAaWep2uiWm1vMUGA2Qb7JY_zAVnk/edit?usp=sharing"
-    sheet = gc.open_by_url(sheet_url).sheet1
-    use_google_sheets = True
-except Exception as e:
-    st.warning("Google Sheets integration is not available. Chats will be saved locally.")
 
 # Helper functions
 def save_chat_history(user_id, history):
@@ -71,21 +53,50 @@ def erase_chat_history(user_id):
     save_chat_history(user_id, st.session_state.messages)
     st.session_state.thread_id = None
 
-def save_chat(user_id, messages):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    content = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in messages])
-    
-    if use_google_sheets:
-        sheet.append_row([timestamp, user_id, content])
-    else:
-        os.makedirs('saved_chats', exist_ok=True)
-        filename = f'saved_chats/{user_id}_{timestamp.replace(":", "-")}.txt'
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(content)
-    
-    return timestamp
+def save_chat_as_txt(user_id, messages):
+    os.makedirs('saved_chats', exist_ok=True)
+    filename = f'saved_chats/{user_id}_{time.strftime("%Y%m%d_%H%M%S")}.txt'
+    with open(filename, 'w', encoding='utf-8') as f:
+        for msg in messages:
+            f.write(f"{msg['role'].capitalize()}: {msg['content']}\n\n")
+    return filename
 
-# [Keep the show_login and show_register functions as they were]
+def show_login():
+    st.sidebar.header("로그인")
+    username = st.sidebar.text_input("사용자 이름", key="login_username")
+    password = st.sidebar.text_input("비밀번호", type="password", key="login_password")
+    if st.sidebar.button("로그인", key="login_button"):
+        if verify_user(username, password):
+            st.session_state.user_id = username
+            st.session_state.authenticated = True
+            st.session_state.messages = load_chat_history(username)
+            st.session_state.thread_id = None
+            st.experimental_rerun()
+        else:
+            st.sidebar.error("잘못된 사용자 이름 또는 비밀번호입니다.")
+    if st.sidebar.button("회원가입으로 전환", key="switch_to_register"):
+        st.session_state.show_register = True
+        st.experimental_rerun()
+
+def show_register():
+    st.sidebar.header("회원가입")
+    new_username = st.sidebar.text_input("새 사용자 이름", key="register_username")
+    new_password = st.sidebar.text_input("새 비밀번호", type="password", key="register_password")
+    if st.sidebar.button("가입하기", key="register_button"):
+        save_user_credentials(new_username, new_password)
+        st.sidebar.success("회원가입이 완료되었습니다. 로그인해주세요.")
+        st.session_state.show_register = False
+        st.experimental_rerun()
+    if st.sidebar.button("로그인으로 전환", key="switch_to_login"):
+        st.session_state.show_register = False
+        st.experimental_rerun()
+
+def save_chat_as_txt(user_id, messages):
+    filename = f'{user_id}_{time.strftime("%Y%m%d_%H%M%S")}.txt'
+    content = ""
+    for msg in messages:
+        content += f"{msg['role'].capitalize()}: {msg['content']}\n\n"
+    return filename, content
 
 def main():
     st.title("💬 캠퍼스 상담사 위드유")
@@ -105,7 +116,57 @@ def main():
             show_login()
         return
 
-    # [Keep the chat interface code as it was]
+    # Chat interface
+    if 'thread_id' not in st.session_state or st.session_state.thread_id is None:
+        thread = client.beta.threads.create()
+        st.session_state.thread_id = thread.id
+    thread_id = st.session_state.thread_id
+
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+
+    if prompt := st.chat_input():
+        if not openai_api_key:
+            st.info("OpenAI API 키를 추가해주세요.")
+            st.stop()
+        
+        if not thread_id:
+            st.info("스레드 ID를 추가해주세요.")
+            st.stop()
+        
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").write(prompt)
+        
+        response = client.beta.threads.messages.create(
+            thread_id, 
+            role="user", 
+            content=prompt,
+        )
+        
+        run = client.beta.threads.runs.create(
+           thread_id=thread_id,
+           assistant_id=assistant_id
+         )
+        
+        run_id = run.id
+        
+        while True: 
+            run = client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run_id
+                )
+            if run.status == "completed":
+                break
+            else: 
+                time.sleep(2)
+        
+        thread_messages = client.beta.threads.messages.list(thread_id)
+        msg = thread_messages.data[0].content[0].text.value
+
+        st.session_state.messages.append({"role": "assistant", "content": msg})
+        st.chat_message("assistant").write(msg)
+
+        save_chat_history(st.session_state.user_id, st.session_state.messages)
 
     # Chat management buttons in sidebar
     st.sidebar.markdown("### 채팅 관리")
@@ -115,11 +176,13 @@ def main():
         st.experimental_rerun()
     
     if st.sidebar.button("대화 저장하기", key="save_chat"):
-        timestamp = save_chat(st.session_state.user_id, st.session_state.messages)
-        if use_google_sheets:
-            st.sidebar.success(f"대화가 Google Sheet에 저장되었습니다. (저장 시간: {timestamp})")
-        else:
-            st.sidebar.success(f"대화가 로컬 파일에 저장되었습니다. (저장 시간: {timestamp})")
+        filename, content = save_chat_as_txt(st.session_state.user_id, st.session_state.messages)
+        st.sidebar.download_button(
+        label="대화 내역 다운로드",
+        data=content,
+        file_name=filename,
+        mime="text/plain"
+    )
     
     if st.sidebar.button("로그아웃", key="logout"):
         st.session_state.authenticated = False
