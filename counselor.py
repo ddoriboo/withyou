@@ -107,9 +107,9 @@ def login_and_register():
     
     with tab1:
         st.header("로그인")
-        username = st.text_input("사용자 이름", key="login_username")
-        password = st.text_input("비밀번호", type="password", key="login_password")
-        if st.button("로그인", key="login_button"):
+        username = st.text_input("사용자 이름", key="login_username_input")
+        password = st.text_input("비밀번호", type="password", key="login_password_input")
+        if st.button("로그인", key="login_submit_button"):
             if verify_user(username, password):
                 st.session_state.user_id = username
                 st.session_state.authenticated = True
@@ -121,9 +121,9 @@ def login_and_register():
 
     with tab2:
         st.header("회원가입")
-        new_username = st.text_input("새 사용자 이름", key="register_username")
-        new_password = st.text_input("새 비밀번호", type="password", key="register_password")
-        if st.button("가입하기", key="register_button"):
+        new_username = st.text_input("새 사용자 이름", key="register_username_input")
+        new_password = st.text_input("새 비밀번호", type="password", key="register_password_input")
+        if st.button("가입하기", key="register_submit_button"):
             save_user_credentials(new_username, new_password)
             st.success("회원가입이 완료되었습니다. 로그인해주세요.")
 
