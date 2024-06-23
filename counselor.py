@@ -4,11 +4,23 @@ from openai import OpenAI
 import os
 import json
 import hashlib
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
 # Set up OpenAI client
 openai_api_key = st.secrets["openai"]["api_key"]
 assistant_id = st.secrets["openai"]["assistant_id"]
 client = OpenAI(api_key=openai_api_key)
+
+# Set up Google Sheets credentials
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+gc = gspread.authorize(creds)
+
+# Open the Google Sheet
+sheet_url = "https://docs.google.com/spreadsheets/d/1G2hSp9NScSyQvVHAaWep2uiWm1vMUGA2Qb7JY_zAVnk/edit?usp=sharing"
+sheet = gc.open_by_url(sheet_url).sheet1
 
 # Helper functions
 def save_chat_history(user_id, history):
@@ -21,7 +33,7 @@ def load_chat_history(user_id):
         with open(f'chat_histories/{user_id}.json', 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        return [{"role": "assistant", "content": "안녕하세요! 저는 위드유 상담사입니다.💕 오늘 상담을 도와드리게 되어 기쁩니다. 먼저, 제가 당신을 어떻게 불러드리면 될까요? 이름이나 별명도 괜찮아요😊"}]
+        return [{"role": "assistant", "content": "어떤 질문이든 해주세요, 예를들어 학업, 진로, 대인관계, 가족, 연애 등에 대한 고민을 말씀해주세요^^"}]
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -53,13 +65,11 @@ def erase_chat_history(user_id):
     save_chat_history(user_id, st.session_state.messages)
     st.session_state.thread_id = None
 
-def save_chat_as_txt(user_id, messages):
-    os.makedirs('saved_chats', exist_ok=True)
-    filename = f'saved_chats/{user_id}_{time.strftime("%Y%m%d_%H%M%S")}.txt'
-    with open(filename, 'w', encoding='utf-8') as f:
-        for msg in messages:
-            f.write(f"{msg['role'].capitalize()}: {msg['content']}\n\n")
-    return filename
+def save_chat_to_sheet(user_id, messages):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    content = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in messages])
+    sheet.append_row([timestamp, user_id, content])
+    return timestamp
 
 def show_login():
     st.sidebar.header("로그인")
@@ -169,8 +179,8 @@ def main():
         st.experimental_rerun()
     
     if st.sidebar.button("대화 저장하기", key="save_chat"):
-        filename = save_chat_as_txt(st.session_state.user_id, st.session_state.messages)
-        st.sidebar.success(f"대화가 {filename}에 저장되었습니다.")
+        timestamp = save_chat_to_sheet(st.session_state.user_id, st.session_state.messages)
+        st.sidebar.success(f"대화가 Google Sheet에 저장되었습니다. (저장 시간: {timestamp})")
     
     if st.sidebar.button("로그아웃", key="logout"):
         st.session_state.authenticated = False
